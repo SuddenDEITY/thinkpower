@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use thinkpower_core::caps::{self, Capabilities};
 use thinkpower_core::config::{Config, ProfileId, SYSTEM_CONFIG_PATH};
+use thinkpower_core::monitor::format_duration;
 use thinkpower_core::rapl::{FieldReport, HwLimits, Outcome};
 use thinkpower_core::status::Status;
 use thinkpower_core::sysfs::RealSysfs;
@@ -175,6 +176,11 @@ fn print_status(s: &Status) {
     }
     if p.battery_w.is_some() {
         println!("Battery draw:      {:>7} now  {:>7} avg {:.0}s", fmt_w(p.battery_w), fmt_w(p.battery_avg_w), p.window_s);
+    }
+    if let Some(left) = p.battery_time_left_s {
+        println!("Battery left:      about {} at {} (1 min average)", format_duration(left), fmt_w(p.battery_minute_avg_w));
+    } else if let Some(full) = p.battery_time_to_full_s {
+        println!("Battery:           charging, full in about {}", format_duration(full));
     }
     if let Some(t) = p.cpu_temp_c {
         println!("CPU temperature:   {t:.0} °C");

@@ -1,6 +1,6 @@
-//! System tray icon (StatusNotifierItem): the laptop's 1-minute average draw
-//! on a badge coloured by the active profile, battery estimate in the
-//! tooltip, profile switching in the menu. Click opens/closes the window.
+//! System tray icon (StatusNotifierItem): estimated battery time left
+//! ("2.5h", "30m") on a badge coloured by the active profile, power details
+//! in the tooltip, profile switching in the menu. Click opens/closes the window.
 
 use crate::cli::fmt_w;
 use crate::client::Client;
@@ -57,34 +57,65 @@ fn profile_rgb(p: Option<ProfileId>) -> [u8; 3] {
     }
 }
 
-/// 5×7 bitmap glyphs, one row per byte (low 5 bits, MSB = left).
-fn glyph(c: char) -> [u8; 7] {
+/// Compact variable-width bitmap font, 7 rows tall ('#' = lit). Narrow
+/// enough that "2.5h" fits a 22 px tray icon.
+fn glyph(c: char) -> [&'static str; 7] {
     match c {
-        '0' => [0x0E, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0E],
-        '1' => [0x04, 0x0C, 0x04, 0x04, 0x04, 0x04, 0x0E],
-        '2' => [0x0E, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1F],
-        '3' => [0x1F, 0x02, 0x04, 0x02, 0x01, 0x11, 0x0E],
-        '4' => [0x02, 0x06, 0x0A, 0x12, 0x1F, 0x02, 0x02],
-        '5' => [0x1F, 0x10, 0x1E, 0x01, 0x01, 0x11, 0x0E],
-        '6' => [0x06, 0x08, 0x10, 0x1E, 0x11, 0x11, 0x0E],
-        '7' => [0x1F, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08],
-        '8' => [0x0E, 0x11, 0x11, 0x0E, 0x11, 0x11, 0x0E],
-        '9' => [0x0E, 0x11, 0x11, 0x0F, 0x01, 0x02, 0x0C],
-        '!' => [0x04, 0x04, 0x04, 0x04, 0x04, 0x00, 0x04],
-        _ => [0x00, 0x00, 0x00, 0x1F, 0x00, 0x00, 0x00], // '-'
+        '0' => [".##.", "#..#", "#..#", "#..#", "#..#", "#..#", ".##."],
+        '1' => ["..#.", ".##.", "..#.", "..#.", "..#.", "..#.", ".###"],
+        '2' => [".##.", "#..#", "...#", "..#.", ".#..", "#...", "####"],
+        '3' => ["###.", "...#", "...#", ".##.", "...#", "...#", "###."],
+        '4' => ["..#.", ".##.", "#.#.", "#.#.", "####", "..#.", "..#."],
+        '5' => ["####", "#...", "###.", "...#", "...#", "#..#", ".##."],
+        '6' => [".##.", "#...", "#...", "###.", "#..#", "#..#", ".##."],
+        '7' => ["####", "...#", "..#.", "..#.", ".#..", ".#..", ".#.."],
+        '8' => [".##.", "#..#", "#..#", ".##.", "#..#", "#..#", ".##."],
+        '9' => [".##.", "#..#", "#..#", ".###", "...#", "...#", ".##."],
+        '.' => [".", ".", ".", ".", ".", ".", "#"],
+        'h' => ["#...", "#...", "#.#.", "##.#", "#..#", "#..#", "#..#"],
+        'm' => [".....", ".....", "##.#.", "#.#.#", "#.#.#", "#.#.#", "#.#.#"],
+        'A' => [".##.", "#..#", "#..#", "####", "#..#", "#..#", "#..#"],
+        'C' => [".###", "#...", "#...", "#...", "#...", "#...", ".###"],
+        '!' => ["#", "#", "#", "#", "#", ".", "#"],
+        _ => ["...", "...", "...", "###", "...", "...", "..."], // '-'
+    }
+}
+
+/// Short duration for the badge: "45m", "2.5h", "3h", "12h".
+fn short_duration(secs: f64) -> String {
+    let mins = (secs / 60.0).round();
+    if mins < 60.0 {
+        return format!("{}m", mins.max(1.0) as u64);
+    }
+    let hours = secs / 3600.0;
+    if hours < 9.95 {
+        let h = (hours * 10.0).round() / 10.0;
+        if h.fract() == 0.0 { format!("{h:.0}h") } else { format!("{h:.1}h") }
+    } else {
+        format!("{}h", (hours.round() as u64).min(99))
     }
 }
 
 /// Render a rounded badge with white text as an ARGB32 (network order) icon.
 fn badge(size: i32, rgb: [u8; 3], text: &str) -> ksni::Icon {
     let n = size as f64;
-    let chars: Vec<char> = text.chars().collect();
-    let units_w = (chars.len() * 5 + chars.len().saturating_sub(1)) as f64;
-    let unit = (n * 0.80 / units_w).min(n * 0.62 / 7.0);
+    // Lay glyphs out left to right with a 1-unit gap: (x offset, glyph).
+    let mut layout = Vec::new();
+    let mut units_w = 0usize;
+    for c in text.chars() {
+        if !layout.is_empty() {
+            units_w += 1;
+        }
+        let g = glyph(c);
+        layout.push((units_w, g));
+        units_w += g[0].len();
+    }
+    let units_w = units_w.max(1) as f64;
+    let unit = (n * 0.86 / units_w).min(n * 0.62 / 7.0);
     let (tw, th) = (units_w * unit, 7.0 * unit);
     let (ox, oy) = ((n - tw) / 2.0, (n - th) / 2.0);
-    let margin = n * 0.04;
-    let radius = n * 0.24;
+    let margin = n * 0.02;
+    let radius = n * 0.22;
 
     let in_badge = |x: f64, y: f64| {
         let (lo, hi) = (margin, n - margin);
@@ -101,8 +132,7 @@ fn badge(size: i32, rgb: [u8; 3], text: &str) -> ksni::Icon {
             return false;
         }
         let (col, row) = (u as usize, v as usize);
-        let (ci, cx) = (col / 6, col % 6);
-        ci < chars.len() && cx < 5 && glyph(chars[ci])[row] & (0x10 >> cx) != 0
+        layout.iter().any(|(x0, g)| col >= *x0 && g[row].as_bytes().get(col - x0) == Some(&b'#'))
     };
 
     const SS: usize = 4;
@@ -145,9 +175,15 @@ impl Tray {
         if self.error.is_some() {
             return "!".into();
         }
-        match self.status.as_ref().and_then(|s| system_avg_w(&s.power)) {
-            Some(w) => (w.round() as i64).clamp(0, 99).to_string(),
-            None => "-".into(),
+        let Some(p) = self.status.as_ref().map(|s| &s.power) else { return "-".into() };
+        if let Some(left) = p.battery_time_left_s {
+            short_duration(left)
+        } else if p.battery_w.is_none() && p.on_ac == Some(true) {
+            // Time to full stays in the tooltip; "+40m" is unreadable at 22 px.
+            "AC".into()
+        } else {
+            // Discharging, but less than a sample of history yet.
+            "-".into()
         }
     }
 
@@ -328,6 +364,25 @@ pub fn run() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn short_durations() {
+        assert_eq!(short_duration(30.0 * 60.0), "30m");
+        assert_eq!(short_duration(10.0), "1m");
+        assert_eq!(short_duration(59.7 * 60.0), "1h");
+        assert_eq!(short_duration(2.5 * 3600.0), "2.5h");
+        assert_eq!(short_duration(3.0 * 3600.0 + 60.0), "3h");
+        assert_eq!(short_duration(9.97 * 3600.0), "10h");
+        assert_eq!(short_duration(12.4 * 3600.0), "12h");
+    }
+
+    #[test]
+    fn every_badge_glyph_is_rectangular() {
+        for c in "0123456789.hmAC!-".chars() {
+            let g = glyph(c);
+            assert!(g.iter().all(|r| r.len() == g[0].len()), "{c}");
+        }
+    }
 
     #[test]
     fn badge_has_opaque_center_and_white_digits() {

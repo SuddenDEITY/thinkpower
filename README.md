@@ -88,16 +88,16 @@ GUI: open **ThinkPower** from the app menu. Edit the values and click
 values currently in the hardware: green means exact, amber means rounded, red
 means different from what you asked for.
 
-Tray: `thinkpower tray` starts automatically when you log in. The icon shows
-the laptop's average draw over the last minute in watts. That's battery draw on
-battery, or platform (psys) power on AC. The badge colour shows the profile:
-green for Power Save, blue for Balanced, orange for Performance. The tooltip
-shows the battery estimate ("about 3 h 10 min left"), CPU package power, the
-current limits and the temperature. Click the icon to open the window and click
-again to close it. A window with unsaved edits is never closed from the tray.
-Right-click the icon to switch profiles. If you use "Hide tray icon", the tray
-comes back at your next login. To turn it off for good, disable it in
-System Settings → Autostart.
+Tray: `thinkpower tray` starts automatically when you log in. On battery, the
+icon shows how long the battery will last at the current pace, for example
+`2.5h` or `30m`. On AC it shows `AC`. The badge colour shows the profile: green
+for Power Save, blue for Balanced, orange for Performance. The tooltip shows the
+estimate in full ("about 2 h 30 min left") or the time to full charge, plus the
+laptop's 1-minute average draw, CPU package power, the current limits and the
+temperature. Click the icon to open the window and click again to close it. A
+window with unsaved edits is never closed from the tray. Right-click the icon to
+switch profiles. If you use "Hide tray icon", the tray comes back at your next
+login. To turn it off for good, disable it in System Settings → Autostart.
 
 Battery life is estimated as the remaining energy (Wh) divided by the average
 draw over the last minute, so it reacts to what you're doing right now.
