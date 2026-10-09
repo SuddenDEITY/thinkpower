@@ -118,6 +118,7 @@ files=(
     /etc/dbus-1/system.d/io.github.thinkpower.Daemon1.conf
     /usr/share/polkit-1/actions/io.github.thinkpower.policy
     "$PREFIX/share/applications/thinkpower.desktop"
+    /etc/xdg/autostart/thinkpower-tray.desktop
     "$LIBEXEC/uninstall.sh"
 )
 install -Dm755 "$BIN/thinkpower" "$PREFIX/bin/thinkpower"
@@ -127,6 +128,7 @@ install -Dm644 "$REPO/packaging/thinkpowerd.service" /etc/systemd/system/thinkpo
 install -Dm644 "$REPO/packaging/io.github.thinkpower.Daemon1.conf" /etc/dbus-1/system.d/io.github.thinkpower.Daemon1.conf
 install -Dm644 "$REPO/packaging/io.github.thinkpower.policy" /usr/share/polkit-1/actions/io.github.thinkpower.policy
 install -Dm644 "$REPO/packaging/thinkpower.desktop" "$PREFIX/share/applications/thinkpower.desktop"
+install -Dm644 "$REPO/packaging/thinkpower-tray.desktop" /etc/xdg/autostart/thinkpower-tray.desktop
 if [[ -n $CONFIG_SRC ]]; then
     install -Dm644 "$CONFIG_SRC" "$CONFIG"
 fi
@@ -146,6 +148,13 @@ systemctl restart thinkpowerd
 ROOT
 
 # --- 7. Verify -----------------------------------------------------------------
+# The tray starts on login (/etc/xdg/autostart); (re)start it now for this session.
+if [[ -n ${DBUS_SESSION_BUS_ADDRESS:-} ]]; then
+    pkill -u "$USER" -f '^/usr/local/bin/thinkpower tray$' 2>/dev/null || true
+    sleep 0.5
+    setsid "$PREFIX/bin/thinkpower" tray >/dev/null 2>&1 < /dev/null &
+fi
+
 say "Verifying"
 sleep 2
 if "$PREFIX/bin/thinkpower" verify | sed 's/^/    /'; then

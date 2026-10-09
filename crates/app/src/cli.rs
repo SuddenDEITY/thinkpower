@@ -23,6 +23,8 @@ pub struct Cli {
 pub enum Command {
     /// Open the GUI (default).
     Gui,
+    /// Run the system tray icon.
+    Tray,
     /// Active profile, configured vs effective limits, live power.
     Status,
     /// Detected hardware and controls (works without the daemon).
@@ -71,7 +73,7 @@ pub enum Command {
 
 pub fn run(cmd: Command) -> ExitCode {
     let res = match cmd {
-        Command::Gui => unreachable!(),
+        Command::Gui | Command::Tray => unreachable!(),
         Command::Status => status(),
         Command::Capabilities => {
             let c = caps::discover(&RealSysfs);

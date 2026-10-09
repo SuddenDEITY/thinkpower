@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=ThinkPower Tray
+Comment=Laptop power draw and battery estimate in the system tray
+Exec=/usr/local/bin/thinkpower tray
+Icon=preferences-system-power
+Terminal=false
+NoDisplay=true
+X-KDE-autostart-phase=2
+X-GNOME-Autostart-enabled=true

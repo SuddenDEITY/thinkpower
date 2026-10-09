@@ -51,7 +51,7 @@ KDE power profile switch
 - **`thinkpowerd`** (root, sandboxed systemd service):
   - follows `ActiveProfile` and applies the configured limits for the active profile;
   - re-checks after resume (logind `PrepareForSleep`) and every 10 s, and writes again only if the hardware drifted;
-  - samples package and platform power once a second, and keeps 30 s averages;
+  - samples package, platform and battery power once a second, keeps 30 s and 1 min averages, and estimates battery life;
   - finds RAPL zones and constraints by name, never by fixed index.
 - **`thinkpower`** (your user): runs the GUI with no arguments, otherwise works as a CLI. It talks to the daemon over D-Bus.
 - **Config:** `/etc/thinkpower/config.toml`, versioned TOML. Example: [`configs/x1-nano-gen3.toml`](configs/x1-nano-gen3.toml).
@@ -88,6 +88,20 @@ GUI: open **ThinkPower** from the app menu. Edit the values and click
 values currently in the hardware: green means exact, amber means rounded, red
 means different from what you asked for.
 
+Tray: `thinkpower tray` starts automatically when you log in. The icon shows
+the laptop's average draw over the last minute in watts. That's battery draw on
+battery, or platform (psys) power on AC. The badge colour shows the profile:
+green for Power Save, blue for Balanced, orange for Performance. The tooltip
+shows the battery estimate ("about 3 h 10 min left"), CPU package power, the
+current limits and the temperature. Click the icon to open the window and click
+again to close it. A window with unsaved edits is never closed from the tray.
+Right-click the icon to switch profiles. If you use "Hide tray icon", the tray
+comes back at your next login. To turn it off for good, disable it in
+System Settings → Autostart.
+
+Battery life is estimated as the remaining energy (Wh) divided by the average
+draw over the last minute, so it reacts to what you're doing right now.
+
 CLI:
 
 ```
@@ -102,6 +116,7 @@ thinkpower export my-laptop.toml
 thinkpower import my-laptop.toml [--clamp] [--yes]
 thinkpower check my-laptop.toml         # compatibility report only
 thinkpower diagnostics
+thinkpower tray                         # system tray icon
 thinkpower restore
 ```
 
@@ -148,6 +163,6 @@ Layout:
 |---|---|
 | `crates/core` | config, validation, RAPL discovery/apply/readback, monitoring (no root, no D-Bus) |
 | `crates/daemon` | `thinkpowerd` |
-| `crates/app` | `thinkpower` GUI (egui) + CLI |
-| `packaging/` | systemd unit, D-Bus policy, polkit policy, .desktop file |
+| `crates/app` | `thinkpower` GUI (egui), tray (StatusNotifierItem) and CLI |
+| `packaging/` | systemd unit, D-Bus policy, polkit policy, .desktop files (app and tray autostart) |
 | `configs/` | per-machine configs |

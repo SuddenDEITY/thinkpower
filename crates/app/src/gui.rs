@@ -3,12 +3,14 @@
 
 use crate::cli::{fmt_s, fmt_w};
 use crate::client::Client;
+use crate::instance::{self, Claim, Remote};
 use eframe::egui::{self, Color32, RichText};
 use egui_plot::{HLine, Legend, Line, Plot, PlotPoints};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use thinkpower_core::caps::Capabilities;
 use thinkpower_core::config::{Config, ProfileId};
+use thinkpower_core::monitor::format_duration;
 use thinkpower_core::rapl::Outcome;
 use thinkpower_core::status::Status;
 use thinkpower_core::validate::{self, Field, Issue, Severity};
@@ -33,6 +35,8 @@ pub struct App {
     draft: Option<Config>,
     message: Option<(bool, String)>,
     confirm_restore: bool,
+    /// Shared with the session-bus object the tray talks to.
+    remote: Remote,
 }
 
 fn spawn_poller(shared: Arc<Mutex<Shared>>, ctx: egui::Context) {
@@ -65,10 +69,11 @@ fn spawn_poller(shared: Arc<Mutex<Shared>>, ctx: egui::Context) {
 }
 
 impl App {
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>, remote: Remote) -> Self {
+        *remote.ctx.lock().unwrap() = Some(cc.egui_ctx.clone());
         let shared = Arc::new(Mutex::new(Shared::default()));
         spawn_poller(shared.clone(), cc.egui_ctx.clone());
-        App { shared, base: None, draft: None, message: None, confirm_restore: false }
+        App { shared, base: None, draft: None, message: None, confirm_restore: false, remote }
     }
 
     fn dirty(&self) -> bool {
@@ -210,22 +215,30 @@ impl App {
             if p.psys_w.is_some() {
                 stat_tile(ui, "PLATFORM (PSYS)", fmt_w(p.psys_w), avg(p.psys_avg_w));
             }
+            let pct = p.battery_percent.map(|v| format!("{v:.0} %")).unwrap_or_default();
             match (p.battery_w, p.on_ac) {
-                (Some(_), _) => stat_tile(ui, "BATTERY DRAW", fmt_w(p.battery_w), avg(p.battery_avg_w)),
+                (Some(_), _) => {
+                    stat_tile(ui, "BATTERY DRAW", fmt_w(p.battery_w), avg(p.battery_avg_w));
+                    stat_tile(
+                        ui,
+                        "BATTERY LEFT",
+                        p.battery_time_left_s.map(format_duration).unwrap_or_else(|| "estimating…".into()),
+                        format!("{pct} at {} (1 min average)", fmt_w(p.battery_minute_avg_w)),
+                    );
+                }
                 (None, Some(true)) => stat_tile(
                     ui,
                     "BATTERY",
-                    p.battery_percent.map(|v| format!("{v:.0} %")).unwrap_or_else(|| "AC".into()),
-                    format!("on AC, {}", p.battery_status.as_deref().unwrap_or("").to_lowercase()),
+                    if pct.is_empty() { "AC".into() } else { pct },
+                    match (p.battery_charge_w, p.battery_time_to_full_s) {
+                        (Some(w), Some(t)) => format!("charging {w:.1} W, full in {}", format_duration(t)),
+                        (Some(w), None) => format!("charging {w:.1} W"),
+                        _ => format!("on AC, {}", p.battery_status.as_deref().unwrap_or("").to_lowercase()),
+                    },
                 ),
                 _ => {}
             }
-            stat_tile(
-                ui,
-                "CPU TEMPERATURE",
-                p.cpu_temp_c.map(|t| format!("{t:.0} °C")).unwrap_or_else(|| "—".into()),
-                p.battery_percent.filter(|_| p.battery_w.is_some()).map(|v| format!("battery {v:.0} %")).unwrap_or_default(),
-            );
+            stat_tile(ui, "CPU TEMPERATURE", p.cpu_temp_c.map(|t| format!("{t:.0} °C")).unwrap_or_else(|| "—".into()), String::new());
         });
 
         let now = s.history.last().map(|h| h.t).unwrap_or(0.0);
@@ -366,6 +379,7 @@ impl eframe::App for App {
             });
         }
         self.sync_config(status.as_ref());
+        self.remote.dirty.store(self.dirty(), std::sync::atomic::Ordering::Relaxed);
         let caps = status.as_ref().map(|s| s.capabilities.clone()).unwrap_or_default();
         let issues = self.draft.as_ref().map(|d| validate::validate(d, status.as_ref().map(|s| &s.capabilities))).unwrap_or_default();
         let dark = root.visuals().dark_mode;
@@ -504,6 +518,13 @@ impl eframe::App for App {
 }
 
 pub fn run() -> eframe::Result<()> {
+    let remote = Remote::default();
+    // Keep the bus connection alive for as long as the window is open.
+    let _instance = match instance::claim(remote.clone()) {
+        Claim::AlreadyRunning => return Ok(()),
+        Claim::Primary(conn) => Some(conn),
+        Claim::Unavailable => None,
+    };
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("ThinkPower")
@@ -512,5 +533,5 @@ pub fn run() -> eframe::Result<()> {
             .with_min_inner_size([760.0, 560.0]),
         ..Default::default()
     };
-    eframe::run_native("ThinkPower", options, Box::new(|cc| Ok(Box::new(App::new(cc)))))
+    eframe::run_native("ThinkPower", options, Box::new(move |cc| Ok(Box::new(App::new(cc, remote)))))
 }

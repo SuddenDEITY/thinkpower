@@ -1,6 +1,8 @@
 mod cli;
 mod client;
 mod gui;
+mod instance;
+mod tray;
 
 use clap::Parser;
 use std::process::ExitCode;
@@ -15,6 +17,7 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        Some(cli::Command::Tray) => tray::run(),
         Some(cmd) => cli::run(cmd),
     }
 }

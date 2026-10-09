@@ -29,6 +29,7 @@ if [[ $YES != 1 ]]; then
 fi
 
 systemctl disable --now thinkpowerd 2>/dev/null || true
+pkill -f '^/usr/local/bin/thinkpower tray$' 2>/dev/null || true
 
 mkdir -p "$STATE"
 if [[ -f /etc/thinkpower/config.toml ]]; then
@@ -44,6 +45,7 @@ else
     files=(/usr/local/bin/thinkpower /usr/local/libexec/thinkpower/thinkpowerd
         /etc/systemd/system/thinkpowerd.service /etc/dbus-1/system.d/io.github.thinkpower.Daemon1.conf
         /usr/share/polkit-1/actions/io.github.thinkpower.policy /usr/local/share/applications/thinkpower.desktop
+        /etc/xdg/autostart/thinkpower-tray.desktop
         /usr/local/libexec/thinkpower/uninstall.sh)
 fi
 for f in "${files[@]}"; do
