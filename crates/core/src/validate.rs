@@ -93,22 +93,13 @@ pub fn validate(cfg: &Config, caps: Option<&Capabilities>) -> Vec<Issue> {
             }
         }
 
-        if let Some(pp) = &p.platform_profile {
-            match caps.map(|c| c.platform_profile.as_ref()) {
-                Some(None) => push(
-                    Field::PlatformProfile,
-                    Severity::Error,
-                    "This machine has no ACPI platform_profile; remove the override.".into(),
-                    None,
-                ),
-                Some(Some(info)) if !info.choices.iter().any(|c| c == pp) => push(
-                    Field::PlatformProfile,
-                    Severity::Error,
-                    format!("platform_profile {pp:?} is not one of: {}.", info.choices.join(", ")),
-                    None,
-                ),
-                _ => {}
-            }
+        if p.platform_profile.is_some() {
+            push(
+                Field::PlatformProfile,
+                Severity::Warning,
+                "platform_profile override is no longer supported (tuned-ppd switches the profile back); it is ignored and will be dropped on save.".into(),
+                None,
+            );
         }
     }
     out
@@ -174,11 +165,12 @@ mod tests {
     }
 
     #[test]
-    fn unknown_platform_profile() {
+    fn legacy_platform_profile_only_warns() {
         let mut c = cfg();
-        c.profiles.performance.platform_profile = Some("turbo".into());
+        c.profiles.performance.platform_profile = Some("balanced".into());
         let issues = validate(&c, Some(&caps(None, None)));
-        assert!(issues.iter().any(|i| i.field == Field::PlatformProfile));
+        assert!(issues.iter().any(|i| i.field == Field::PlatformProfile && i.severity == Severity::Warning));
+        assert!(!has_errors(&issues));
     }
 
     #[test]

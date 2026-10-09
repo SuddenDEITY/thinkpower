@@ -57,9 +57,11 @@ KDE power profile switch
 - **Config:** `/etc/thinkpower/config.toml`, versioned TOML. Example: [`configs/x1-nano-gen3.toml`](configs/x1-nano-gen3.toml).
 
 ThinkPower does **not** modify tuned profiles or `ppd.conf`. Fedora's stock
-tuned tuning (EPP, governor, platform_profile, …) keeps working. ThinkPower only
-adds the RAPL limits on top. If you want, you can also override
-`platform_profile` for each profile (for example, keep `balanced` in Performance).
+tuned tuning (EPP, governor, ACPI `platform_profile`, …) keeps working.
+ThinkPower only adds the RAPL limits on top. It deliberately does not set
+`platform_profile` itself: tuned-ppd watches that file and switches the desktop
+profile to match, so overriding it, for example keeping `balanced` while in
+Performance, makes Performance jump back to Balanced.
 
 ### Two RAPL interfaces
 
@@ -109,7 +111,6 @@ thinkpower status                       # active profile, configured vs effectiv
 thinkpower capabilities                 # what this hardware supports (no daemon needed)
 thinkpower profiles
 thinkpower set power-save --pl1 6 --pl2 12 --tau 3
-thinkpower set performance --platform-profile balanced
 thinkpower apply                        # re-apply the active profile now
 thinkpower verify                       # exit 1 if hardware doesn't match
 thinkpower export my-laptop.toml

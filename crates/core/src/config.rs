@@ -89,9 +89,10 @@ pub struct ProfileConfig {
     pub pl1_w: f64,
     pub pl2_w: f64,
     pub tau_s: f64,
-    /// Optional ACPI platform_profile override (e.g. "balanced"). When unset,
-    /// whatever tuned chose for this profile is left alone.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Removed feature: overriding the ACPI platform_profile fights tuned-ppd,
+    /// which follows platform_profile changes and switches the desktop profile
+    /// back. Still parsed so old configs load (with a warning), never written.
+    #[serde(default, skip_serializing)]
     pub platform_profile: Option<String>,
 }
 
@@ -200,8 +201,7 @@ mod tests {
         let c = Config::from_toml(FIXTURE).unwrap();
         assert_eq!(c.profiles.balanced.limits(), Limits { pl1_w: 10.0, pl2_w: 20.0, tau_s: 8.0 });
         assert_eq!(c.profiles.performance.pl2_w, 64.0);
-        assert_eq!(c.profiles.performance.platform_profile.as_deref(), Some("balanced"));
-        assert_eq!(c.profiles.power_save.platform_profile, None);
+        assert_eq!(c.profiles.performance.platform_profile, None);
     }
 
     #[test]
@@ -233,6 +233,14 @@ mod tests {
             Ok(c) => assert_eq!(c.profiles.power_save.pl1_w, 5.0),
             Err(e) => panic!("integers should be accepted: {e}"),
         }
+    }
+
+    #[test]
+    fn legacy_platform_profile_is_read_but_not_written() {
+        let s = FIXTURE.replace("tau_s = 28.0", "tau_s = 28.0\nplatform_profile = \"balanced\"");
+        let c = Config::from_toml(&s).unwrap();
+        assert_eq!(c.profiles.performance.platform_profile.as_deref(), Some("balanced"));
+        assert!(!c.to_toml().contains("platform_profile"));
     }
 
     #[test]

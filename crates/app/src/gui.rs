@@ -273,7 +273,6 @@ impl App {
         let active = s.and_then(|s| s.active) == Some(id);
         let caps = s.map(|s| &s.capabilities);
         let pl1_max = caps.and_then(|c| c.rapl.as_ref()).and_then(|z| z.pl1_max_w);
-        let choices: Vec<String> = caps.and_then(|c| c.platform_profile.as_ref()).map(|p| p.choices.clone()).unwrap_or_default();
         let base = self.base.as_ref().map(|b| b.profiles.get(id).clone());
         let Some(draft) = self.draft.as_mut() else { return };
 
@@ -303,17 +302,6 @@ impl App {
                 ui.label("Tau").on_hover_text("Time window PL1 is averaged over");
                 ui.add(egui::DragValue::new(&mut p.tau_s).speed(0.25).range(0.01..=448.0).fixed_decimals(1).suffix(" s"));
                 ui.end_row();
-                if !choices.is_empty() || p.platform_profile.is_some() {
-                    ui.label("Platform").on_hover_text("ACPI platform_profile override. Default: whatever tuned sets.");
-                    let text = p.platform_profile.clone().unwrap_or_else(|| "tuned default".into());
-                    egui::ComboBox::from_id_salt(("pp", id)).selected_text(text).show_ui(ui, |ui| {
-                        ui.selectable_value(&mut p.platform_profile, None, "tuned default");
-                        for c in &choices {
-                            ui.selectable_value(&mut p.platform_profile, Some(c.clone()), c);
-                        }
-                    });
-                    ui.end_row();
-                }
             });
             if changed {
                 ui.label(RichText::new("modified — not applied yet").small().color(amber(dark)));
@@ -334,12 +322,6 @@ impl App {
                             Outcome::Unsupported => "  not supported".into(),
                         };
                         ui.label(RichText::new(format!("{v}{note}")).color(outcome_color(&f.outcome, dark)));
-                        ui.end_row();
-                    }
-                    if let Some(pp) = &r.platform_profile {
-                        ui.label("Platform");
-                        let ok = pp.effective.as_deref() == Some(pp.requested.as_str());
-                        ui.label(RichText::new(pp.effective.clone().unwrap_or("—".into())).color(if ok { green(dark) } else { red(dark) }));
                         ui.end_row();
                     }
                 });

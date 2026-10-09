@@ -41,12 +41,6 @@ pub enum Command {
         pl2: Option<f64>,
         #[arg(long)]
         tau: Option<f64>,
-        /// Override the ACPI platform_profile for this profile (e.g. balanced).
-        #[arg(long, conflicts_with = "no_platform_profile")]
-        platform_profile: Option<String>,
-        /// Leave platform_profile to tuned.
-        #[arg(long)]
-        no_platform_profile: bool,
     },
     /// Re-apply the active profile's configured limits now.
     Apply,
@@ -82,9 +76,7 @@ pub fn run(cmd: Command) -> ExitCode {
             Ok(if c.blocking_problem().is_some() { ExitCode::FAILURE } else { ExitCode::SUCCESS })
         }
         Command::Profiles => profiles(),
-        Command::Set { profile, pl1, pl2, tau, platform_profile, no_platform_profile } => {
-            set(&profile, pl1, pl2, tau, platform_profile, no_platform_profile)
-        }
+        Command::Set { profile, pl1, pl2, tau } => set(&profile, pl1, pl2, tau),
         Command::Apply => connect().and_then(|c| c.reapply()).map(|s| {
             print_status(&s);
             verdict(&s)
@@ -164,9 +156,6 @@ fn print_status(s: &Status) {
         println!("{}", field_line("PL1", &r.pl1, false));
         println!("{}", field_line("PL2", &r.pl2, false));
         println!("{}", field_line("Tau", &r.tau, true));
-        if let Some(pp) = &r.platform_profile {
-            println!("  platform_profile requested {} effective {}", pp.requested, pp.effective.as_deref().unwrap_or("—"));
-        }
     }
     let p = &s.power;
     println!();
@@ -236,9 +225,6 @@ fn print_profiles(cfg: &Config) {
     for id in ProfileId::ALL {
         let p = cfg.profiles.get(id);
         print!("{:<12} PL1 {:>7}  PL2 {:>7}  Tau {:>6.1} s", id.label(), fmt_w(Some(p.pl1_w)), fmt_w(Some(p.pl2_w)), p.tau_s);
-        if let Some(pp) = &p.platform_profile {
-            print!("  platform_profile={pp}");
-        }
         println!();
     }
 }
@@ -282,8 +268,6 @@ fn set(
     pl1: Option<f64>,
     pl2: Option<f64>,
     tau: Option<f64>,
-    platform_profile: Option<String>,
-    no_platform_profile: bool,
 ) -> Result<ExitCode, String> {
     let id = ProfileId::parse(profile).ok_or_else(|| format!("unknown profile {profile:?} (power-save, balanced, performance)"))?;
     let mut cfg = current_config()?;
@@ -296,12 +280,6 @@ fn set(
     }
     if let Some(v) = tau {
         p.tau_s = v;
-    }
-    if platform_profile.is_some() {
-        p.platform_profile = platform_profile;
-    }
-    if no_platform_profile {
-        p.platform_profile = None;
     }
     let issues = validate::validate(&cfg, Some(&caps::discover(&RealSysfs)));
     print_issues(&issues);

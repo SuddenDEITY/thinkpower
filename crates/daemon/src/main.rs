@@ -14,7 +14,7 @@ use thinkpower_core::caps::{self, Capabilities};
 use thinkpower_core::config::{Config, ProfileId, SYSTEM_CONFIG_PATH};
 use thinkpower_core::monitor::PowerMonitor;
 use thinkpower_core::platform::{self};
-use thinkpower_core::rapl::{self, ApplyReport, PlatformReport, RaplZone};
+use thinkpower_core::rapl::{self, ApplyReport, RaplZone};
 use thinkpower_core::status::Status;
 use thinkpower_core::sysfs::{RealSysfs, Sysfs};
 use thinkpower_core::validate::{self, Severity};
@@ -24,8 +24,8 @@ use zbus::{fdo, interface, proxy};
 
 const RECONCILE_EVERY: Duration = Duration::from_secs(10);
 const SAMPLE_EVERY: Duration = Duration::from_secs(1);
-/// tuned applies its own profile (including platform_profile) around the time
-/// PPD reports the switch; check again shortly after so our override wins.
+/// tuned applies its own profile around the time PPD reports the switch;
+/// check again shortly after in case anything touched the RAPL limits.
 const POST_SWITCH_RECHECK: Duration = Duration::from_secs(3);
 const POST_RESUME_DELAY: Duration = Duration::from_secs(2);
 
@@ -142,15 +142,7 @@ impl State {
         }
         let (Some(cfg), Some(zone)) = (&self.config, &self.zone) else { return };
         let pc = cfg.profiles.get(profile).clone();
-        let mut report = zone.apply(&*self.fs, profile, &pc.limits(), reason);
-        if let Some(pp) = &pc.platform_profile {
-            let error = platform::write(&*self.fs, pp).err().map(|e| e.to_string());
-            let effective = platform::current(&*self.fs);
-            if error.is_some() || effective.as_deref() != Some(pp) {
-                report.success = false;
-            }
-            report.platform_profile = Some(PlatformReport { requested: pp.clone(), effective, error });
-        }
+        let report = zone.apply(&*self.fs, profile, &pc.limits(), reason);
         log("rapl_apply", serde_json::to_value(&report).unwrap_or_default());
         self.last_apply = Some(report);
     }
@@ -162,16 +154,11 @@ impl State {
             (None, _) => true,
             (Some(last), _) if last.profile != profile => true,
             (Some(last), Some(zone)) => {
-                let rapl_drift = match (zone.read_limits(&*self.fs), &last.effective) {
+                // Don't hammer firmware that keeps refusing: only retry on real drift.
+                match (zone.read_limits(&*self.fs), &last.effective) {
                     (Ok(now), Some(prev)) => now.drifted_from(prev),
                     _ => true,
-                };
-                let pp_drift = last
-                    .platform_profile
-                    .as_ref()
-                    .is_some_and(|p| platform::current(&*self.fs).as_deref() != Some(p.requested.as_str()));
-                // Don't hammer firmware that keeps refusing: only retry on real drift.
-                rapl_drift || pp_drift
+                }
             }
             _ => false,
         };

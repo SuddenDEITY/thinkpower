@@ -153,13 +153,6 @@ pub struct FieldReport {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct PlatformReport {
-    pub requested: String,
-    pub effective: Option<String>,
-    pub error: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ApplyReport {
     pub event: String,
     pub reason: String,
@@ -168,8 +161,6 @@ pub struct ApplyReport {
     pub pl1: FieldReport,
     pub pl2: FieldReport,
     pub tau: FieldReport,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub platform_profile: Option<PlatformReport>,
     pub effective: Option<HwLimits>,
     pub success: bool,
 }
@@ -275,7 +266,6 @@ impl RaplZone {
             pl1,
             pl2,
             tau,
-            platform_profile: None,
             effective: after,
             success,
         }

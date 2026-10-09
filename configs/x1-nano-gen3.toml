@@ -10,8 +10,8 @@ model = "ThinkPad X1 Nano Gen 3"
 cpu = "13th Gen Intel(R) Core(TM) i7-1370P"
 
 [profiles.power_save]
-pl1_w = 6.0
-pl2_w = 12.0
+pl1_w = 7.0
+pl2_w = 14.0
 tau_s = 3.0
 
 [profiles.balanced]
@@ -23,5 +23,3 @@ tau_s = 8.0
 pl1_w = 28.0
 pl2_w = 64.0
 tau_s = 28.0
-# Keep the firmware platform profile at "balanced" (tuned would pick "performance").
-platform_profile = "balanced"
