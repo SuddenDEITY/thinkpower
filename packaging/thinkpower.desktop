@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=ThinkPower
+GenericName=CPU Power Limits
+Comment=Set PL1/PL2/Tau for Power Save, Balanced and Performance
+Exec=/usr/local/bin/thinkpower
+Icon=preferences-system-power
+Terminal=false
+Categories=Settings;HardwareSettings;
+Keywords=power;rapl;tdp;watts;thinkpad;
+StartupWMClass=thinkpower

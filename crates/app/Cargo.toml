@@ -1,0 +1,13 @@
+[package]
+name = "thinkpower"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.6.7", features = ["derive"] }
+eframe = "0.36.2"
+egui_plot = "0.37.0"
+rfd = "0.17.2"
+serde_json = "1.0.151"
+thinkpower-core = { version = "0.1.0", path = "../core" }
+zbus = "5.19.0"

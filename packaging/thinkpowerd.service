@@ -1,0 +1,28 @@
+[Unit]
+Description=ThinkPower: bind CPU power limits (Intel RAPL) to desktop power profiles
+After=dbus.service
+
+[Service]
+Type=dbus
+BusName=io.github.thinkpower.Daemon1
+ExecStart=/usr/local/libexec/thinkpower/thinkpowerd
+Restart=on-failure
+RestartSec=2
+
+# Needs root for /sys/class/powercap and /sys/firmware/acpi/platform_profile.
+# Everything else is locked down; /sys stays writable under ProtectSystem=strict.
+ProtectSystem=strict
+ConfigurationDirectory=thinkpower
+ReadWritePaths=/etc/thinkpower
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_UNIX
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictRealtime=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

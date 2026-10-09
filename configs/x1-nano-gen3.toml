@@ -1,0 +1,27 @@
+# ThinkPower configuration. Units: watts (pl1_w, pl2_w), seconds (tau_s).
+#
+# Tuned on a ThinkPad X1 Nano Gen 3 (i7-1370P, Fedora 44 KDE).
+# PL1 = sustained package power, PL2 = short boost ceiling,
+# tau = how long (seconds) PL1 is averaged over.
+version = 1
+
+[machine]
+model = "ThinkPad X1 Nano Gen 3"
+cpu = "13th Gen Intel(R) Core(TM) i7-1370P"
+
+[profiles.power_save]
+pl1_w = 6.0
+pl2_w = 12.0
+tau_s = 3.0
+
+[profiles.balanced]
+pl1_w = 10.0
+pl2_w = 20.0
+tau_s = 8.0
+
+[profiles.performance]
+pl1_w = 28.0
+pl2_w = 64.0
+tau_s = 28.0
+# Keep the firmware platform profile at "balanced" (tuned would pick "performance").
+platform_profile = "balanced"
